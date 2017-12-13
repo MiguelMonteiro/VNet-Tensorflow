@@ -23,8 +23,8 @@ def convolution_block_2(layer_input, fine_grained_features, n_channels, num_conv
     for i in range(1, num_convolutions):
         with tf.variable_scope('conv_' + str(i+1)):
             x = convolution_layer_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
-        if i != num_convolutions - 1:
-            x = prelu(x)
+            if i != num_convolutions - 1:
+                x = prelu(x)
     return prelu(x + layer_input)
 
 

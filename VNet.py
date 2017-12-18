@@ -1,41 +1,45 @@
 import tensorflow as tf
-from Layers import convolution_layer_3d, deconvolution_layer_3d, prelu
-
-# Same as VNet but with fixed skip connections.
+from .Layers import convolution_3d, deconvolution_3d, prelu
 
 
 def convolution_block(layer_input, n_channels, num_convolutions):
     x = layer_input
-    for i in range(num_convolutions):
+    for i in range(num_convolutions - 1):
         with tf.variable_scope('conv_' + str(i+1)):
-            x = convolution_layer_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
-            if i != num_convolutions - 1:
-                x = prelu(x)
-    return prelu(x + layer_input)
+            x = convolution_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
+            x = prelu(x)
+    x = convolution_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
+    x = x + layer_input
+    return prelu(x)
 
 
 def convolution_block_2(layer_input, fine_grained_features, n_channels, num_convolutions):
 
     x = tf.concat((layer_input, fine_grained_features), axis=-1)
-    with tf.variable_scope('conv_' + str(1)):
-        x = prelu(convolution_layer_3d(x, [5, 5, 5, n_channels * 2, n_channels], [1, 1, 1, 1, 1]))
 
-    for i in range(1, num_convolutions):
+    with tf.variable_scope('conv_' + str(1)):
+        x = convolution_3d(x, [5, 5, 5, n_channels * 2, n_channels], [1, 1, 1, 1, 1])
+
+    for i in range(1, num_convolutions - 1):
         with tf.variable_scope('conv_' + str(i+1)):
-            x = convolution_layer_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
-            if i != num_convolutions - 1:
-                x = prelu(x)
-    return prelu(x + layer_input)
+            x = convolution_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
+            x = prelu(x)
+
+    x = convolution_3d(x, [5, 5, 5, n_channels, n_channels], [1, 1, 1, 1, 1])
+    x = x + layer_input
+    return prelu(x)
 
 
 def down_convolution(layer_input, in_channels):
     with tf.variable_scope('down_convolution'):
-        return prelu(convolution_layer_3d(layer_input, [2, 2, 2, in_channels, in_channels * 2], [1, 2, 2, 2, 1]))
+        x = convolution_3d(layer_input, [2, 2, 2, in_channels, in_channels * 2], [1, 2, 2, 2, 1])
+        return prelu(x)
 
 
 def up_convolution(layer_input, output_shape, in_channels):
     with tf.variable_scope('up_convolution'):
-        return prelu(deconvolution_layer_3d(layer_input, [2, 2, 2, in_channels // 2, in_channels], output_shape, [1, 2, 2, 2, 1]))
+        x = deconvolution_3d(layer_input, [2, 2, 2, in_channels // 2, in_channels], output_shape, [1, 2, 2, 2, 1])
+        return prelu(x)
 
 
 def v_net(tf_input, input_channels, output_channels=1, n_channels=16):
@@ -47,7 +51,7 @@ def v_net(tf_input, input_channels, output_channels=1, n_channels=16):
             c0 = tf.tile(tf_input, [1, 1, 1, 1, n_channels])
         else:
             with tf.variable_scope('level_0'):
-                c0 = prelu(convolution_layer_3d(tf_input, [5, 5, 5, input_channels, n_channels], [1, 1, 1, 1, 1]))
+                c0 = prelu(convolution_3d(tf_input, [5, 5, 5, input_channels, n_channels], [1, 1, 1, 1, 1]))
 
         with tf.variable_scope('level_1'):
             c1 = convolution_block(c0, n_channels, 1)
@@ -86,6 +90,6 @@ def v_net(tf_input, input_channels, output_channels=1, n_channels=16):
         with tf.variable_scope('level_1'):
             e1 = convolution_block_2(e22, c1, n_channels, 1)
             with tf.variable_scope('output_layer'):
-                logits = convolution_layer_3d(e1, [1, 1, 1, n_channels, output_channels], [1, 1, 1, 1, 1])
+                logits = convolution_3d(e1, [1, 1, 1, n_channels, output_channels], [1, 1, 1, 1, 1])
 
     return logits
